@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorteo de Habitaciones</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏠 Sorteo de Habitaciones</h1>
+            <p>¡Organiza tu estancia perfecta!</p>
+            <p style="font-size: 1rem; margin-top: 10px; opacity: 0.8;">
+                📊 Espacios disponibles: 3 habitaciones (6 plazas) + 3 tiendas (6 plazas) + campers personalizables
+            </p>
+        </div>
+
+        <div id="formSection">
+            <div class="form-section">
+                <h2>👥 Personas</h2>
+                <div id="nameInput">
+                    <textarea id="nameList"
+                        placeholder="Escribe los nombres separados por comas o uno por línea&#10;Ejemplo: Juan, María, Pedro&#10;Ana&#10;Carlos, Lucía"></textarea>
+                    <button class="add-btn" onclick="processPeople()">✨ Procesar Nombres</button>
+                </div>
+                <div id="personCards" style="display: none;"></div>
+            </div>
+
+            <div class="form-section">
+                <h2>🚐 Campers</h2>
+                <div id="camperList"></div>
+                <button class="add-btn" onclick="addCamper()">+ Añadir Camper</button>
+            </div>
+
+            <div class="form-section">
+                <h2>⚙️ Opciones</h2>
+                <div class="toggle-options">
+                    <div class="toggle-option">
+                        <input type="checkbox" id="randomMode">
+                        <label for="randomMode">Modo completamente aleatorio</label>
+                    </div>
+                </div>
+            </div>
+
+            <button class="sorteo-btn" onclick="startSorteo()">🎲 ¡EMPEZAR SORTEO!</button>
+        </div>
+
+        <div class="roulette-container" id="rouletteContainer">
+            <h2>🎯 ¡Sorteando habitaciones!</h2>
+            <div class="roulette"></div>
+            <p>¡La suerte está decidiendo vuestra estancia!</p>
+        </div>
+
+        <div class="results" id="results">
+            <h2>🎉 ¡Resultados del Sorteo!</h2>
+            <div id="resultsList"></div>
+            <button class="sorteo-btn" onclick="newSorteo()">🔄 Nuevo Sorteo</button>
+        </div>
+    </div>
+
+    <div class="floating-hearts" id="hearts"></div>
+
+    <script>
+        let personCount = 0;
+        let camperCount = 0;
+        let sorteoAudio;
+
+        // Inicializar con una persona y una camper
+        window.onload = function () {
+            processPeople();
+            addCamper();
+        };
+
+        function processPeople() {
+            const nameList = document.getElementById('nameList').value;
+            if (!nameList.trim()) return;
+
+            const names = nameList.split(/[,\n]/).map(n => n.trim()).filter(n => n);
+            createPersonCards(names);
+
+            document.getElementById('nameInput').style.display = 'none';
+            document.getElementById('personCards').style.display = 'block';
+        }
+
+        function createPersonCards(names) {
+            // Implementar la creación de cards dinámicas
+        }
+
+        function editNames() {
+            document.getElementById('nameInput').style.display = 'block';
+            document.getElementById('personCards').style.display = 'none';
+        }
+
+        function addCamper() {
+            camperCount++;
+            const camperList = document.getElementById('camperList');
+            const camperDiv = document.createElement('div');
+            camperDiv.className = 'camper-item';
+            camperDiv.innerHTML = `
+                <input type="text" placeholder="Nombre/Marca de la camper" id="camperName${camperCount}">
+                <input type="number" placeholder="Capacidad" id="camperCapacity${camperCount}" min="1" max="8" value="2">
+                <button class="remove-btn" onclick="removeCamper(this)">Eliminar</button>
+            `;
+            camperList.appendChild(camperDiv);
+        }
+
+        function removeCamper(button) {
+            button.parentElement.remove();
+        }
+
+        // Actualizar opciones de pareja cuando se escriben nombres
+        document.addEventListener('input', function (e) {
+            if (e.target.id.startsWith('person')) {
+                updatePartnerOptions();
+            }
+        });
+
+        function startSorteo() {
+            const people = getPeople();
+            const campers = getCampers();
+
+            if (people.length === 0) {
+                alert('Por favor, añade al menos una persona.');
+                return;
+            }
+
+            // Mostrar ruleta
+            document.getElementById('formSection').style.display = 'none';
+            document.getElementById('rouletteContainer').style.display = 'block';
+
+            // Crear y reproducir audio
+            createSorteoAudio();
+
+            // Mostrar resultados después de 4 segundos
+            setTimeout(() => {
+                showResults(people, campers);
+            }, 4000);
+        }
+
+        function createSorteoAudio() {
+            // Crear audio usando Web Audio API
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(880, audioContext.currentTime + 2);
+            oscillator.frequency.exponentialRampToValueAtTime(220, audioContext.currentTime + 4);
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 4);
+
+            oscillator.type = 'sine';
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 4);
+        }
+
+        function getPeople() {
+            if (!window.currentNames) return [];
+
+            return window.currentNames.map((name, index) => ({
+                name: name,
+                isBaby: document.getElementById(`baby-${index}`).checked,
+                partner: window.currentNames[document.getElementById(`partner-${index}`).value] || null
+            }));
+        }
+
+        function getCampers() {
+            const campers = [];
+            const camperInputs = document.querySelectorAll('[id^="camperName"]');
+
+            camperInputs.forEach(input => {
+                if (input.value.trim()) {
+                    const id = input.id.replace('camperName', '');
+                    const capacity = parseInt(document.getElementById(`camperCapacity${id}`).value) || 2;
+
+                    campers.push({
+                        name: input.value.trim(),
+                        capacity: capacity,
+                        occupants: []
+                    });
+                }
+            });
+
+            return campers;
+        }
+
+        function showResults(people, campers) {
+            const randomMode = document.getElementById('randomMode').checked;
+            const results = assignRooms(people, campers, randomMode);
+
+            document.getElementById('rouletteContainer').style.display = 'none';
+            document.getElementById('results').style.display = 'block';
+
+            displayResults(results);
+            createHearts();
+        }
+
+        function assignRooms(people, campers, randomMode) {
+            const rooms = {
+                'Habitación con Cuna 🍼': { capacity: 2, occupants: [], hasCrib: true },
+                'Habitación Principal 🛏️': { capacity: 2, occupants: [] },
+                'Habitación Guardilla 🏠': { capacity: 2, occupants: [] },
+                'Tienda 1 ⛺': { capacity: 2, occupants: [] },
+                'Tienda 2 ⛺': { capacity: 2, occupants: [] },
+                'Tienda 3 ⛺': { capacity: 2, occupants: [] }
+            };
+
+            // Añadir campers a las opciones
+            campers.forEach(camper => {
+                rooms[`Camper: ${camper.name} 🚐`] = {
+                    capacity: camper.capacity,
+                    occupants: []
+                };
+            });
+
+            let availablePeople = [...people];
+            let pairs = [];
+
+            // Si no es modo aleatorio, procesar bebés primero
+            if (!randomMode) {
+                const babies = availablePeople.filter(p => p.isBaby);
+                babies.forEach(baby => {
+                    if (rooms['Habitación con Cuna 🍼'].occupants.length < rooms['Habitación con Cuna 🍼'].capacity) {
+                        rooms['Habitación con Cuna 🍼'].occupants.push(baby);
+                        availablePeople = availablePeople.filter(p => p !== baby);
+                    }
+                });
+
+                // Crear parejas
+                const remainingPeople = availablePeople.filter(p => !p.isBaby);
+                remainingPeople.forEach(person => {
+                    if (person.partner && availablePeople.find(p => p.name === person.partner)) {
+                        const partner = availablePeople.find(p => p.name === person.partner);
+                        if (!pairs.some(pair => pair.includes(person) || pair.includes(partner))) {
+                            pairs.push([person, partner]);
+                        }
+                    }
+                });
+
+                // Remover personas en parejas de availablePeople
+                pairs.forEach(pair => {
+                    availablePeople = availablePeople.filter(p => !pair.includes(p));
+                });
+            }
+
+            // Mezclar para aleatoriedad
+            if (randomMode) {
+                availablePeople = shuffle(availablePeople);
+            } else {
+                pairs = shuffle(pairs);
+                availablePeople = shuffle(availablePeople);
+            }
+
+            // Asignar parejas primero
+            if (!randomMode) {
+                pairs.forEach(pair => {
+                    const availableRooms = Object.keys(rooms).filter(room =>
+                        rooms[room].occupants.length + 2 <= rooms[room].capacity
+                    );
+
+                    if (availableRooms.length > 0) {
+                        const randomRoom = availableRooms[Math.floor(Math.random() * availableRooms.length)];
+                        rooms[randomRoom].occupants.push(...pair);
+                    }
+                });
+            }
+
+            // Asignar personas restantes
+            availablePeople.forEach(person => {
+                const availableRooms = Object.keys(rooms).filter(room =>
+                    rooms[room].occupants.length < rooms[room].capacity
+                );
+
+                if (availableRooms.length > 0) {
+                    const randomRoom = availableRooms[Math.floor(Math.random() * availableRooms.length)];
+                    rooms[randomRoom].occupants.push(person);
+                }
+            });
+
+            return rooms;
+        }
+
+        function createPersonCards(names) {
+            const personCards = document.getElementById('personCards');
+            personCards.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3>Configura las personas (${names.length})</h3>
+            <button class="add-btn" onclick="editNames()">✏️ Editar Lista</button>
+        </div>
+    `;
+
+            names.forEach((name, index) => {
+                const card = document.createElement('div');
+                card.className = 'person-card';
+                card.id = `card-${index}`;
+
+                card.innerHTML = `
+            <div class="card-header">
+                <h4>${name}</h4>
+                <div class="person-options">
+                    <label>
+                        <input type="checkbox" id="baby-${index}" onchange="updateCard(${index})"> 👶 Bebé
+                    </label>
+                    <select id="partner-${index}" onchange="updatePairings()">
+                        <option value="">Sin pareja</option>
+                        ${names.map((n, i) => i !== index ? `<option value="${i}">${n}</option>` : '').join('')}
+                    </select>
+                </div>
+            </div>
+        `;
+
+                personCards.appendChild(card);
+            });
+
+            // Guardar nombres globalmente
+            window.currentNames = names;
+        }
+
+        function updateCard(index) {
+            const card = document.getElementById(`card-${index}`);
+            const isBaby = document.getElementById(`baby-${index}`).checked;
+
+            if (isBaby) {
+                card.style.background = 'rgba(254, 202, 87, 0.2)';
+                card.style.borderColor = '#feca57';
+            } else {
+                card.style.background = 'rgba(255,255,255,0.15)';
+                card.style.borderColor = 'transparent';
+            }
+        }
+
+        function updatePairings() {
+            // Resetear todas las cards
+            window.currentNames.forEach((_, index) => {
+                const card = document.getElementById(`card-${index}`);
+                if (!document.getElementById(`baby-${index}`).checked) {
+                    card.classList.remove('paired');
+                }
+            });
+
+            // Marcar parejas
+            window.currentNames.forEach((_, index) => {
+                const partnerIndex = document.getElementById(`partner-${index}`).value;
+                if (partnerIndex) {
+                    const card = document.getElementById(`card-${index}`);
+                    const partnerCard = document.getElementById(`card-${partnerIndex}`);
+
+                    card.classList.add('paired');
+                    partnerCard.classList.add('paired');
+
+                    // Sincronizar la pareja inversa
+                    document.getElementById(`partner-${partnerIndex}`).value = index;
+                }
+            });
+        }
+
+        function shuffle(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        function displayResults(results) {
+            const resultsList = document.getElementById('resultsList');
+            resultsList.innerHTML = '';
+
+            Object.keys(results).forEach(room => {
+                if (results[room].occupants.length > 0) {
+                    const roomDiv = document.createElement('div');
+                    roomDiv.className = 'room-result';
+
+                    const roomTitle = document.createElement('h3');
+                    roomTitle.textContent = room;
+                    roomDiv.appendChild(roomTitle);
+
+                    const occupantsList = document.createElement('ul');
+                    results[room].occupants.forEach(person => {
+                        const li = document.createElement('li');
+                        li.textContent = person.name;
+                        if (person.isBaby) {
+                            li.classList.add('baby');
+                            li.textContent += ' 👶';
+                        }
+                        occupantsList.appendChild(li);
+                    });
+                    roomDiv.appendChild(occupantsList);
+
+                    resultsList.appendChild(roomDiv);
+                }
+            });
+        }
+
+        function createHearts() {
+            const heartsContainer = document.getElementById('hearts');
+            heartsContainer.innerHTML = '';
+
+            for (let i = 0; i < 15; i++) {
+                setTimeout(() => {
+                    const heart = document.createElement('div');
+                    heart.className = 'heart';
+                    heart.textContent = '💖';
+                    heart.style.left = Math.random() * 100 + '%';
+                    heart.style.animationDelay = Math.random() * 2 + 's';
+                    heartsContainer.appendChild(heart);
+
+                    setTimeout(() => {
+                        heart.remove();
+                    }, 6000);
+                }, i * 200);
+            }
+        }
+
+        function newSorteo() {
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('formSection').style.display = 'block';
+            document.getElementById('hearts').innerHTML = '';
+        }
+    </script>
+</body>
+
+</html>
